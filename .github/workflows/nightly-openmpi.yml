@@ -142,7 +142,6 @@ jobs:
 
   publish-nightly:
     name: Publish nightly pre-release
-    if: github.event_name != 'push'
     needs: build
     runs-on: ubuntu-24.04
 

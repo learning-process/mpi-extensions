@@ -182,7 +182,7 @@ a stable tag or explicit commit, never a floating branch.
 
 - `workflow_dispatch`
 - nightly schedule at `02:37 UTC`
-- push validation on `main`
+- push builds on `main`
 
-Scheduled and manual runs replace the assets in the same `nightly` pre-release.
-Pushes to `main` build and validate packages but do not publish release assets.
+Pushes to `main`, scheduled runs, and manual runs replace the assets in the same
+`nightly` pre-release after successful builds.
