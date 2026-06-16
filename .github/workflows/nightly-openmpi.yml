@@ -1,0 +1,184 @@
+name: Nightly Open MPI Extensions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 2 * * *"
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            runner: ubuntu-24.04
+            shmem: required
+            shmem_validation: passed
+          - platform: macos-arm64
+            runner: macos-15
+            shmem: disabled
+            shmem_validation: unsupported
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/_ccache
+      MPI_EXTENSIONS_CCACHE: on
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: _ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-${{ hashFiles('manifests/openmpi-version.json', '.gitmodules') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-
+            ccache-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf \
+            automake \
+            bison \
+            build-essential \
+            ca-certificates \
+            ccache \
+            flex \
+            libtool \
+            libucx-dev \
+            perl \
+            pkg-config \
+            python3 \
+            python3-pip \
+            rsync \
+            zlib1g-dev
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          brew update
+          brew install autoconf automake bison ccache flex libtool pkg-config rsync
+          {
+            echo "$(brew --prefix bison)/bin"
+            echo "$(brew --prefix flex)/bin"
+          } >> "$GITHUB_PATH"
+
+      - name: Install Python dependencies
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Build Open MPI
+        run: |
+          set -euo pipefail
+          ccache -z
+          ./scripts/build_openmpi.sh \
+            --prefix "$PWD/_install/openmpi" \
+            --build-dir "$PWD/_build/openmpi-${{ matrix.platform }}" \
+            --enable-shmem "${{ matrix.shmem }}" \
+            --ccache on
+
+      - name: Validate MPI
+        run: ./scripts/smoke_test_mpi.sh "$PWD/_install/openmpi"
+
+      - name: Validate OpenSHMEM
+        if: matrix.shmem == 'required'
+        run: ./scripts/smoke_test_shmem.sh "$PWD/_install/openmpi"
+
+      - name: Record unsupported OpenSHMEM on macOS
+        if: matrix.shmem != 'required'
+        run: |
+          set -euo pipefail
+          MPI_EXTENSIONS_ALLOW_UNSUPPORTED_SHMEM=1 \
+            ./scripts/smoke_test_shmem.sh "$PWD/_install/openmpi"
+
+      - name: Package Open MPI
+        run: |
+          set -euo pipefail
+          ./scripts/package_openmpi.sh \
+            --prefix "$PWD/_install/openmpi" \
+            --out "$PWD/_dist" \
+            --platform "${{ matrix.platform }}" \
+            --mpi-smoke passed \
+            --shmem-smoke "${{ matrix.shmem_validation }}"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openmpi-${{ matrix.platform }}
+          path: |
+            _dist/*.tar.gz
+            _dist/*.sha256
+            _dist/*.manifest.json
+          if-no-files-found: error
+
+      - name: Print ccache stats
+        if: always()
+        run: ccache -s
+
+  publish-nightly:
+    name: Publish nightly pre-release
+    if: github.event_name != 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: _release_assets
+          merge-multiple: true
+
+      - name: Replace nightly release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$(find _release_assets -maxdepth 1 -type f -print -quit)"
+
+          git tag -f nightly "$GITHUB_SHA"
+          git push origin refs/tags/nightly --force
+
+          notes="Moving nightly Open MPI binary packages for parallel_programming_course. This release is replaced by every scheduled or manual run."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly \
+              --title "Nightly Open MPI Extensions" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
+            mapfile -t old_assets < <(gh release view nightly --json assets --jq '.assets[].name')
+            for asset in "${old_assets[@]}"; do
+              gh release delete-asset nightly "$asset" -y
+            done
+          else
+            gh release create nightly \
+              --title "Nightly Open MPI Extensions" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
+          fi
+
+          gh release upload nightly _release_assets/* --clobber
