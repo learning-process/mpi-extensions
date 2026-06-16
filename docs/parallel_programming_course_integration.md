@@ -5,11 +5,12 @@ supplier only. Do not install Homebrew or apt Open MPI in the course CI job.
 
 ## GitHub Actions usage
 
-Install the current nightly package before configuring the course build:
+Install the current `main` pre-release package before configuring the course
+build:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_nightly_release.py \
+  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_main_release.py \
   -o /tmp/install_mpi_extensions.py
 python3 /tmp/install_mpi_extensions.py \
   --repo learning-process/mpi-extensions \
@@ -37,8 +38,9 @@ packages provide MPI through Open MPI and SHMEM through Sandia OpenSHMEM/SOS
 built against the same Open MPI PMIx/hwloc prefix and libfabric/OFI. macOS
 packages are also validated with two-rank MPI and SHMEM C smoke tests.
 
-## Nightly channel
+## Main Channel
 
-Only the `nightly` pre-release is public. Scheduled and manual workflow runs
-replace assets in that same release, including the archive, SHA256 checksum,
-and JSON manifest for every platform.
+Only the moving `main` pre-release is public. Pull requests validate package
+builds but do not publish. Successful builds from the `main` branch replace
+assets in that same release, including the archive, SHA256 checksum, and JSON
+manifest for every platform.

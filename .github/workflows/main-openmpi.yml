@@ -1,9 +1,10 @@
-name: Nightly Open MPI Extensions
+name: Main Open MPI Extensions
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "37 2 * * *"
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -140,8 +141,11 @@ jobs:
         if: always()
         run: ccache -s
 
-  publish-nightly:
-    name: Publish nightly pre-release
+  publish-main:
+    name: Publish main pre-release
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-24.04
 
@@ -155,33 +159,33 @@ jobs:
           path: _release_assets
           merge-multiple: true
 
-      - name: Replace nightly release assets
+      - name: Replace main release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -n "$(find _release_assets -maxdepth 1 -type f -print -quit)"
 
-          git tag -f nightly "$GITHUB_SHA"
-          git push origin refs/tags/nightly --force
+          git tag -f main "$GITHUB_SHA"
+          git push origin refs/tags/main --force
 
-          notes="Moving nightly Open MPI binary packages for parallel_programming_course. This release is replaced by every scheduled or manual run."
-          if gh release view nightly >/dev/null 2>&1; then
-            gh release edit nightly \
-              --title "Nightly Open MPI Extensions" \
+          notes="Moving main-branch Open MPI binary packages for parallel_programming_course. This release is replaced after every successful main build."
+          if gh release view main >/dev/null 2>&1; then
+            gh release edit main \
+              --title "Main Open MPI Extensions" \
               --notes "$notes" \
               --prerelease \
               --latest=false
-            mapfile -t old_assets < <(gh release view nightly --json assets --jq '.assets[].name')
+            mapfile -t old_assets < <(gh release view main --json assets --jq '.assets[].name')
             for asset in "${old_assets[@]}"; do
-              gh release delete-asset nightly "$asset" -y
+              gh release delete-asset main "$asset" -y
             done
           else
-            gh release create nightly \
-              --title "Nightly Open MPI Extensions" \
+            gh release create main \
+              --title "Main Open MPI Extensions" \
               --notes "$notes" \
               --prerelease \
               --latest=false
           fi
 
-          gh release upload nightly _release_assets/* --clobber
+          gh release upload main _release_assets/* --clobber

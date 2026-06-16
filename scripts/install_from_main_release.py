@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the current nightly Open MPI package from GitHub Releases."""
+"""Install the current main Open MPI package from GitHub Releases."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
+
+RELEASE_TAG = "main"
 
 try:
     import requests
@@ -83,7 +85,7 @@ def github_session() -> requests.Session:
         {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "mpi-extensions-nightly-installer",
+            "User-Agent": "mpi-extensions-main-installer",
         }
     )
     token = os.environ.get("GITHUB_TOKEN")
@@ -95,7 +97,7 @@ def github_session() -> requests.Session:
 def request_json(session: requests.Session, url: str) -> dict[str, object]:
     response = session.get(url, timeout=60)
     if response.status_code == 404:
-        die(f"nightly pre-release not found at {url}")
+        die(f"main pre-release not found at {url}")
     response.raise_for_status()
     return response.json()
 
@@ -154,14 +156,14 @@ def validate_archive_link(
 
 
 def select_assets(release: dict[str, object], platform: str) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
-    if release.get("tag_name") != "nightly":
-        die("release tag is not nightly")
+    if release.get("tag_name") != RELEASE_TAG:
+        die(f"release tag is not {RELEASE_TAG}")
     if not release.get("prerelease", False):
-        die("nightly release is not marked as a prerelease")
+        die("main release is not marked as a prerelease")
 
     assets = release.get("assets")
     if not isinstance(assets, list):
-        die("nightly release metadata does not contain assets")
+        die("main release metadata does not contain assets")
 
     archive = None
     for asset in assets:
@@ -170,7 +172,7 @@ def select_assets(release: dict[str, object], platform: str) -> tuple[dict[str, 
             archive = asset
             break
     if archive is None:
-        die(f"no nightly archive asset found for platform {platform}")
+        die(f"no main archive asset found for platform {platform}")
 
     by_name = {str(asset.get("name", "")): asset for asset in assets}
     checksum = by_name.get(f"{archive['name']}.sha256")
@@ -230,7 +232,7 @@ def main() -> int:
     platform = detect_platform() if args.platform == "auto" else args.platform
     prefix = Path(args.prefix).expanduser().resolve()
     session = github_session()
-    release_url = f"https://api.github.com/repos/{args.repo}/releases/tags/nightly"
+    release_url = f"https://api.github.com/repos/{args.repo}/releases/tags/{RELEASE_TAG}"
     release = request_json(session, release_url)
     archive_asset, checksum_asset, manifest_asset = select_assets(release, platform)
 

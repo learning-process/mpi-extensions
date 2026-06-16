@@ -6,9 +6,10 @@ The packages are built from pinned git submodules and are intended for rootless
 CI use: download, extract, and pass the unpacked package prefix to the course
 CMake configure step.
 
-This repository publishes only one public binary channel: the moving `nightly`
-pre-release named `Nightly Open MPI Extensions`. Stable versioned releases are
-not supported here.
+This repository publishes only one public binary channel: the moving `main`
+pre-release named `Main Open MPI Extensions`. It is replaced only after
+successful builds from the `main` branch. Stable versioned releases and
+scheduled nightly releases are not supported here.
 
 ## Source Pins
 
@@ -35,9 +36,9 @@ MPI and Sandia OpenSHMEM/SOS for SHMEM. SOS is built against the package's Open
 MPI PMIx/hwloc install and libfabric/OFI, then packaged with the needed runtime
 libraries for rootless CI use.
 
-## Nightly assets
+## Main Assets
 
-The workflow publishes these archive assets to the `nightly` pre-release:
+The workflow publishes these archive assets to the `main` pre-release:
 
 - `mpi-extensions-openmpi-v5.0.10-linux-x86_64.tar.gz`
 - `mpi-extensions-openmpi-v5.0.10-macos-arm64.tar.gz`
@@ -50,18 +51,18 @@ Each archive is uploaded with:
 Archives unpack under a single top-level directory and contain `bin/`, `lib/`,
 `include/`, `share/`, `manifest.json`, and `LICENSES/`.
 
-## Install from the nightly release
+## Install From The Main Release
 
 For local use from this repository:
 
 ```bash
-./scripts/install_from_nightly_release.py \
+./scripts/install_from_main_release.py \
   --repo learning-process/mpi-extensions \
   --platform auto \
   --prefix "$PWD/_deps/mpi-extensions-openmpi"
 ```
 
-The installer downloads only the `nightly` pre-release, verifies the SHA256
+The installer downloads only the `main` pre-release, verifies the SHA256
 checksum, extracts into the requested prefix, and prints environment values for
 manual debugging.
 
@@ -70,7 +71,7 @@ installer script directly from this repository:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_nightly_release.py \
+  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_main_release.py \
   -o /tmp/install_mpi_extensions.py
 python3 /tmp/install_mpi_extensions.py \
   --repo learning-process/mpi-extensions \
@@ -178,11 +179,12 @@ a stable tag or explicit commit, never a floating branch.
 
 ## Workflow
 
-`.github/workflows/nightly-openmpi.yml` supports:
+`.github/workflows/main-openmpi.yml` supports:
 
 - `workflow_dispatch`
-- nightly schedule at `02:37 UTC`
+- pull request validation targeting `main`
 - push builds on `main`
 
-Pushes to `main`, scheduled runs, and manual runs replace the assets in the same
-`nightly` pre-release after successful builds.
+Pull requests build and validate packages but do not publish. Pushes to `main`
+replace the assets in the same `main` pre-release after successful builds. A
+manual run from the `main` branch follows the same publish path.
