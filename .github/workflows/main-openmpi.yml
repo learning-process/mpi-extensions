@@ -162,6 +162,14 @@ jobs:
       - name: Replace main release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: |
+            Prebuilt Open MPI packages for parallel_programming_course.
+
+            Features:
+            - Open MPI v5.0.10 MPI toolchain: mpicc, mpicxx, mpirun, mpiexec.
+            - Linux x86_64 OpenSHMEM/OSHMEM support via Open MPI and bundled UCX runtime libraries.
+            - macOS arm64 SHMEM support via Sandia OpenSHMEM/SOS over Open MPI PMIx and bundled libfabric.
+            - Relocatable, rootless archives with SHA256 checksums and JSON manifests.
         run: |
           set -euo pipefail
           test -n "$(find _release_assets -maxdepth 1 -type f -print -quit)"
@@ -169,7 +177,7 @@ jobs:
           git tag -f main "$GITHUB_SHA"
           git push origin refs/tags/main --force
 
-          notes="Moving main-branch Open MPI binary packages for parallel_programming_course. This release is replaced after every successful main build."
+          notes="$RELEASE_NOTES"
           if gh release view main >/dev/null 2>&1; then
             gh release edit main \
               --title "Main Open MPI Extensions" \
