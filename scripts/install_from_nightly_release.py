@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 try:
     import requests
@@ -109,6 +109,50 @@ def download(session: requests.Session, url: str, path: Path) -> None:
                     handle.write(chunk)
 
 
+def path_is_inside(path: Path, directory: Path) -> bool:
+    return path == directory or directory in path.parents
+
+
+def archive_member_path(member: tarfile.TarInfo) -> PurePosixPath:
+    member_path = PurePosixPath(member.name)
+    if member_path.is_absolute() or not member_path.parts:
+        die(f"unsafe path in archive: {member.name}")
+    if any(part in {"", ".", ".."} for part in member_path.parts):
+        die(f"unsafe path in archive: {member.name}")
+    return member_path
+
+
+def validate_archive_member_type(member: tarfile.TarInfo) -> None:
+    if member.isdir() or member.isfile() or member.issym() or member.islnk():
+        return
+    die(f"unsupported archive member type: {member.name}")
+
+
+def validate_archive_link(
+    member: tarfile.TarInfo,
+    member_path: PurePosixPath,
+    destination: Path,
+    resolved_destination: Path,
+) -> None:
+    if not (member.issym() or member.islnk()):
+        return
+    if not member.linkname:
+        die(f"empty archive link target: {member.name}")
+
+    link_path = PurePosixPath(member.linkname)
+    if link_path.is_absolute():
+        die(f"absolute archive link target: {member.name} -> {member.linkname}")
+
+    member_target = (destination / Path(*member_path.parts)).resolve(strict=False)
+    if member.issym():
+        link_target = (member_target.parent / member.linkname).resolve(strict=False)
+    else:
+        link_target = (destination / member.linkname).resolve(strict=False)
+
+    if not path_is_inside(link_target, resolved_destination):
+        die(f"archive link target escapes destination: {member.name} -> {member.linkname}")
+
+
 def select_assets(release: dict[str, object], platform: str) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     if release.get("tag_name") != "nightly":
         die("release tag is not nightly")
@@ -141,11 +185,24 @@ def select_assets(release: dict[str, object], platform: str) -> tuple[dict[str, 
 def safe_extract_tar(archive: Path, destination: Path) -> None:
     destination = destination.resolve()
     with tarfile.open(archive, "r:gz") as tar:
-        for member in tar.getmembers():
-            target = (destination / member.name).resolve()
-            if not str(target).startswith(str(destination) + os.sep):
+        members = tar.getmembers()
+        member_paths: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
+        for member in members:
+            member_path = archive_member_path(member)
+            validate_archive_member_type(member)
+            member_paths.append((member, member_path))
+            target = (destination / Path(*member_path.parts)).resolve(strict=False)
+            if not path_is_inside(target, destination):
                 die(f"unsafe path in archive: {member.name}")
-        tar.extractall(destination)
+            validate_archive_link(member, member_path, destination, destination)
+
+        symlink_paths = {member_path for member, member_path in member_paths if member.issym()}
+        for member, member_path in member_paths:
+            for symlink_path in symlink_paths:
+                if symlink_path in member_path.parents:
+                    die(f"archive member is nested under a symlink: {member.name}")
+
+        tar.extractall(destination, members=members)
 
 
 def copy_clean(source: Path, destination: Path) -> None:

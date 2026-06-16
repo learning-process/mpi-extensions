@@ -38,6 +38,8 @@ def shmem_env(prefix: Path) -> dict[str, str]:
             "OMPI_ALLOW_RUN_AS_ROOT": env.get("OMPI_ALLOW_RUN_AS_ROOT", "1"),
             "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": env.get("OMPI_ALLOW_RUN_AS_ROOT_CONFIRM", "1"),
             "OMPI_MCA_shmem": env.get("OMPI_MCA_shmem", "mmap"),
+            "OSHRUN_LAUNCHER": env.get("OSHRUN_LAUNCHER", str(prefix / "bin" / "mpirun")),
+            "SHMEM_OFI_PROVIDER": env.get("SHMEM_OFI_PROVIDER", "sockets"),
         }
     )
     return env

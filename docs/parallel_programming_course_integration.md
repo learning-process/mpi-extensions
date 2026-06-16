@@ -9,37 +9,33 @@ Install the current nightly package before configuring the course build:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_nightly_release.sh \
+  https://raw.githubusercontent.com/learning-process/mpi-extensions/main/scripts/install_from_nightly_release.py \
   -o /tmp/install_mpi_extensions.py
 python3 /tmp/install_mpi_extensions.py \
   --repo learning-process/mpi-extensions \
   --platform auto \
   --prefix "$PWD/_deps/mpi-extensions-openmpi"
 
-export MPI_EXTENSIONS_HOME="$PWD/_deps/mpi-extensions-openmpi"
-export MPI_HOME="$MPI_EXTENSIONS_HOME"
-export OPAL_PREFIX="$MPI_EXTENSIONS_HOME"
-export PATH="$MPI_EXTENSIONS_HOME/bin:$PATH"
-export LD_LIBRARY_PATH="$MPI_EXTENSIONS_HOME/lib:${LD_LIBRARY_PATH:-}"
-export DYLD_LIBRARY_PATH="$MPI_EXTENSIONS_HOME/lib:${DYLD_LIBRARY_PATH:-}"
-
-cmake -S . -B build
+MPI_EXTENSIONS_HOME="$PWD/_deps/mpi-extensions-openmpi"
+cmake -S . -B build -D PPC_MPI_EXTENSIONS_HOME="$MPI_EXTENSIONS_HOME"
 cmake --build build --parallel
 ```
 
-The package is intended to be discovered by CMake through the Open MPI wrapper
-compilers in `bin/`. Keep `PATH` pointed at the package before calling CMake so
-`find_package(MPI)` resolves `mpicc` and `mpicxx` from this archive.
+The package is intended to be passed to course CMake through
+`PPC_MPI_EXTENSIONS_HOME`. The course configuration then points MPI discovery at
+the wrapper compilers in the package and writes the runtime environment needed
+by `scripts/run_tests.py`.
 
 ## Platform behavior
 
-Linux packages are built with MPI and OpenSHMEM/OSHMEM enabled, bundle the UCX
-runtime libraries needed by OpenSHMEM, and are validated with two-rank C smoke
-tests.
+Linux packages are built with MPI and Open MPI OSHMEM/OpenSHMEM enabled,
+bundle the UCX runtime libraries needed by OpenSHMEM, and are validated with
+two-rank C smoke tests.
 
 Open MPI 5.0.x marks OSHMEM as Linux-only in its configure logic, so macOS
-packages provide MPI tooling only. Their manifest records the OpenSHMEM smoke
-test as `unsupported`.
+packages provide MPI through Open MPI and SHMEM through Sandia OpenSHMEM/SOS
+built against the same Open MPI PMIx/hwloc prefix and libfabric/OFI. macOS
+packages are also validated with two-rank MPI and SHMEM C smoke tests.
 
 ## Nightly channel
 

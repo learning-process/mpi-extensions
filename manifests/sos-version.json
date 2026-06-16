@@ -1,0 +1,7 @@
+{
+  "sos_git_url": "https://github.com/Sandia-OpenSHMEM/SOS.git",
+  "sos_ref": "v1.5.3",
+  "sos_commit": "45e6e7eb1a9b099a418237a9e677eb6603222c84",
+  "submodule_path": "external/sos",
+  "notes": "Pinned as a git submodule. Used to provide macOS OpenSHMEM/SHMEM support over Open MPI PMIx and libfabric/OFI because Open MPI 5.0.x OSHMEM configure support is Linux-only."
+}

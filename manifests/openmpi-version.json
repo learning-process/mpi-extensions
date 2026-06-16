@@ -3,5 +3,5 @@
   "openmpi_ref": "v5.0.10",
   "openmpi_commit": "0d48030d410ae8f56790933135b28be1b3920ba1",
   "submodule_path": "external/ompi",
-  "notes": "Pinned as a git submodule. Open MPI OSHMEM/OpenSHMEM support is enabled and validated on Linux; upstream Open MPI 5.0.x marks OSHMEM as Linux-only."
+  "notes": "Pinned as a git submodule. Open MPI provides MPI on all supported platforms and Open MPI OSHMEM/OpenSHMEM on Linux. macOS OpenSHMEM support is supplied by the pinned Sandia OpenSHMEM/SOS submodule over Open MPI PMIx and libfabric/OFI."
 }

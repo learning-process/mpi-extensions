@@ -1,3 +1,6 @@
 [submodule "external/ompi"]
 	path = external/ompi
 	url = https://github.com/open-mpi/ompi
+[submodule "external/sos"]
+	path = external/sos
+	url = https://github.com/Sandia-OpenSHMEM/SOS.git

@@ -22,11 +22,13 @@ jobs:
           - platform: linux-x86_64
             runner: ubuntu-24.04
             shmem: required
+            sos: false
             shmem_validation: passed
           - platform: macos-arm64
             runner: macos-15
             shmem: disabled
-            shmem_validation: unsupported
+            sos: true
+            shmem_validation: passed
     env:
       CCACHE_DIR: ${{ github.workspace }}/_ccache
       MPI_EXTENSIONS_CCACHE: on
@@ -41,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _ccache
-          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-${{ hashFiles('manifests/openmpi-version.json', '.gitmodules') }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-${{ hashFiles('manifests/openmpi-version.json', 'manifests/sos-version.json', '.gitmodules') }}
           restore-keys: |
             ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.platform }}-
             ccache-${{ runner.os }}-${{ runner.arch }}-
@@ -73,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           brew update
-          brew install autoconf automake bison ccache flex libtool pkg-config rsync
+          brew install autoconf automake bison ccache flex libfabric libtool pkg-config rsync
           {
             echo "$(brew --prefix bison)/bin"
             echo "$(brew --prefix flex)/bin"
@@ -92,30 +94,32 @@ jobs:
         run: |
           set -euo pipefail
           ccache -z
-          ./scripts/build_openmpi.sh \
+          ./scripts/build_openmpi.py \
             --prefix "$PWD/_install/openmpi" \
             --build-dir "$PWD/_build/openmpi-${{ matrix.platform }}" \
             --enable-shmem "${{ matrix.shmem }}" \
             --ccache on
 
-      - name: Validate MPI
-        run: ./scripts/smoke_test_mpi.sh "$PWD/_install/openmpi"
-
-      - name: Validate OpenSHMEM
-        if: matrix.shmem == 'required'
-        run: ./scripts/smoke_test_shmem.sh "$PWD/_install/openmpi"
-
-      - name: Record unsupported OpenSHMEM on macOS
-        if: matrix.shmem != 'required'
+      - name: Build Sandia OpenSHMEM/SOS
+        if: matrix.sos
         run: |
           set -euo pipefail
-          MPI_EXTENSIONS_ALLOW_UNSUPPORTED_SHMEM=1 \
-            ./scripts/smoke_test_shmem.sh "$PWD/_install/openmpi"
+          ./scripts/build_sos_shmem.py \
+            --prefix "$PWD/_install/openmpi" \
+            --build-dir "$PWD/_build/sos-${{ matrix.platform }}" \
+            --mpi-prefix "$PWD/_install/openmpi" \
+            --ccache on
+
+      - name: Validate MPI
+        run: ./scripts/smoke_test_mpi.py "$PWD/_install/openmpi"
+
+      - name: Validate OpenSHMEM
+        run: ./scripts/smoke_test_shmem.py "$PWD/_install/openmpi"
 
       - name: Package Open MPI
         run: |
           set -euo pipefail
-          ./scripts/package_openmpi.sh \
+          ./scripts/package_openmpi.py \
             --prefix "$PWD/_install/openmpi" \
             --out "$PWD/_dist" \
             --platform "${{ matrix.platform }}" \
